@@ -1,0 +1,7 @@
+{
+  "name": "SI-ARNI Jember (Sistem Pengarsipan Akta Nikah)",
+  "description": "Aplikasi pengarsipan akta nikah digital untuk 31 kecamatan di Kabupaten Jember dengan fitur ekstraksi teks cerdas menggunakan Gemini AI untuk efisiensi penyimpanan.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
