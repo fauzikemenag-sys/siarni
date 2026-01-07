@@ -15,11 +15,17 @@ const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogo
   return (
     <aside className="w-64 bg-slate-900 text-white min-h-screen flex flex-col fixed left-0 top-0">
       <div className="p-6 border-b border-slate-800">
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <i className="fas fa-archive text-emerald-400"></i>
-          SI-ARNI
-        </h1>
-        <p className="text-xs text-slate-400 mt-1 uppercase tracking-wider">Arsip Akta Nikah Jember</p>
+        <div className="flex items-center gap-3">
+          <img 
+            src="https://www.freepnglogos.com/uploads/logo-kemenag-png/logo-kementerian-agama-gambar-logo-depag-png-0.png" 
+            alt="Logo Kemenag" 
+            className="w-10 h-10 object-contain"
+          />
+          <div>
+            <h1 className="text-xl font-bold leading-tight">SI-ARNI</h1>
+            <p className="text-[10px] text-slate-400 uppercase tracking-wider">Kemenag Jember</p>
+          </div>
+        </div>
       </div>
 
       <div className="p-6">

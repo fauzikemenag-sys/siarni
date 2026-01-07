@@ -187,8 +187,12 @@ const App: React.FC = () => {
 
         <div className="bg-white/10 backdrop-blur-xl p-8 rounded-[40px] border border-white/10 w-full max-w-md relative z-10 shadow-2xl">
           <div className="text-center mb-10">
-            <div className="w-20 h-20 bg-emerald-500 rounded-3xl mx-auto flex items-center justify-center text-4xl text-white shadow-xl shadow-emerald-500/20 mb-4 rotate-3">
-              <i className="fas fa-archive"></i>
+            <div className="w-24 h-24 bg-white rounded-3xl mx-auto flex items-center justify-center shadow-xl shadow-emerald-500/10 mb-6 p-4">
+              <img 
+                src="https://www.freepnglogos.com/uploads/logo-kemenag-png/logo-kementerian-agama-gambar-logo-depag-png-0.png" 
+                alt="Kemenag Logo" 
+                className="w-full h-full object-contain"
+              />
             </div>
             <h1 className="text-3xl font-black text-white mb-2 tracking-tight">SI-ARNI Jember</h1>
             <p className="text-slate-400 text-sm">Sistem Informasi Pengarsipan Akta Nikah</p>
