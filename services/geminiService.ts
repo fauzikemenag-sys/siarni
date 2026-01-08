@@ -1,8 +1,37 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Standardized client initialization using direct process.env.API_KEY access
+/**
+ * Fungsi pembantu untuk mengambil variabel lingkungan secara aman
+ * di berbagai environment (Vercel, Vite, local).
+ */
+const getEnv = (key: string) => {
+  const viteKey = `VITE_${key}`;
+  
+  if (typeof process !== 'undefined' && process.env && process.env[key]) return process.env[key];
+  if (typeof process !== 'undefined' && process.env && process.env[viteKey]) return process.env[viteKey];
+
+  try {
+    const metaEnv = (import.meta as any).env;
+    if (metaEnv && metaEnv[viteKey]) return metaEnv[viteKey];
+    if (metaEnv && metaEnv[key]) return metaEnv[key];
+  } catch (e) {}
+  
+  try {
+    const winProc = (window as any).process;
+    if (winProc?.env && winProc.env[key]) return winProc.env[key];
+    if (winProc?.env && winProc.env[viteKey]) return winProc.env[viteKey];
+  } catch (e) {}
+
+  return '';
+};
+
 const getAiClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getEnv('API_KEY');
+  if (!apiKey) {
+    console.warn("API_KEY tidak ditemukan di environment variables.");
+  }
+  return new GoogleGenAI({ apiKey: apiKey });
 };
 
 export interface DocumentPart {
@@ -11,8 +40,8 @@ export interface DocumentPart {
 }
 
 /**
- * Extract structured marriage record data from images using Gemini 3 Flash.
- * Follows the prescribed content structure and result extraction pattern.
+ * Ekstrak data akta nikah menggunakan Gemini 3 Flash.
+ * Dioptimalkan untuk dokumen Indonesia dan format tanggal.
  */
 export const extractMarriageDataBatch = async (documents: DocumentPart[]) => {
   try {
@@ -24,14 +53,22 @@ export const extractMarriageDataBatch = async (documents: DocumentPart[]) => {
       },
     }));
 
-    // Calling generateContent with the model name directly in parameters
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
         parts: [
           ...documentParts,
           {
-            text: "Analisa dokumen Akta Nikah ini. Ekstrak informasi berikut: Nama Suami, Nama Istri, Tanggal Nikah (YYYY-MM-DD), Nomor NB (biasanya di pojok atau bagian atas), Nomor Akta Nikah (Nomor pendaftaran), dan transkrip lengkap teksnya.",
+            text: `Analisa foto dokumen Akta Nikah/Buku Nikah dari Indonesia ini. 
+            Ekstrak informasi berikut dengan akurat:
+            1. Nama Lengkap Suami
+            2. Nama Lengkap Istri
+            3. Tanggal Pernikahan (konversi ke format YYYY-MM-DD, contoh: 03 Januari 2025 menjadi 2025-01-03)
+            4. Nomor NB (Nomor Berkas/Perforasi di pojok)
+            5. Nomor Akta Nikah (Nomor pendaftaran resmi)
+            6. Transkrip lengkap teks yang ada di dokumen.
+
+            PENTING: Jika ada informasi yang tidak terbaca, kosongkan saja stringnya (null/empty).`,
           },
         ],
       },
@@ -47,18 +84,19 @@ export const extractMarriageDataBatch = async (documents: DocumentPart[]) => {
             nomorAkta: { type: Type.STRING },
             fullText: { type: Type.STRING },
           },
-          required: ["husbandName", "wifeName", "marriageDate", "nomorNB", "nomorAkta", "fullText"],
+          // Jangan buat field menjadi 'required' agar tidak error jika satu field tidak terbaca
         },
       },
     });
 
-    // Directly access the .text property as per updated SDK documentation
     const text = response.text;
-    if (!text) throw new Error("AI returned empty response");
+    if (!text) throw new Error("AI memberikan respon kosong (mungkin terblokir filter keamanan)");
     
     return JSON.parse(text);
-  } catch (error) {
-    console.error("Gemini Extraction Error:", error);
-    throw error;
+  } catch (error: any) {
+    console.error("Gemini Extraction Detail Error:", error);
+    // Berikan pesan error yang lebih spesifik jika memungkinkan
+    const errorMessage = error?.message || "Unknown AI Error";
+    throw new Error(errorMessage);
   }
 };

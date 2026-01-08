@@ -23,6 +23,7 @@ interface FilePreview {
 
 const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
   const [status, setStatus] = useState<'IDLE' | 'COMPRESSING' | 'EXTRACTING' | 'SAVING' | 'SUCCESS'>('IDLE');
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [lastUploaded, setLastUploaded] = useState<MarriageRecord | null>(null);
   const [formData, setFormData] = useState({
     husbandName: '',
@@ -54,6 +55,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
     setExtractedText('');
     setFilePreviews([]);
     setStatus('IDLE');
+    setErrorDetail(null);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,6 +63,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
     if (files.length === 0) return;
     const selectedFiles = files.slice(0, 4);
 
+    setErrorDetail(null);
     const newPreviews: FilePreview[] = [];
     const loadFile = (file: File): Promise<string> => new Promise(res => {
       const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(file);
@@ -95,9 +98,11 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
         nomorAkta: result.nomorAkta || '',
       }));
       setExtractedText(result.fullText || '');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Gagal ekstraksi AI. Periksa koneksi atau API Key.");
+      const msg = err.message || "Gagal ekstraksi AI.";
+      setErrorDetail(msg);
+      alert(`Gagal ekstraksi AI: ${msg}\n\nTips: Periksa apakah API Key sudah benar dan memiliki kuota.`);
     } finally {
       setStatus('IDLE');
     }
@@ -185,9 +190,19 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
           Pencatatan & Upload Arsip Akta Nikah
         </h2>
         
+        {errorDetail && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-4 text-red-600 animate-in slide-in-from-top-2">
+            <i className="fas fa-exclamation-triangle text-xl"></i>
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest">Gagal Ekstraksi AI</p>
+              <p className="text-[11px] font-medium mt-1">{errorDetail}</p>
+            </div>
+            <button onClick={() => setErrorDetail(null)} className="ml-auto text-red-400 hover:text-red-600"><i className="fas fa-times"></i></button>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Upload Area */}
             <div 
               className={`border-2 border-dashed rounded-[32px] p-6 transition-all cursor-pointer flex flex-col items-center justify-center min-h-[350px] ${
                 filePreviews.length > 0 ? 'border-emerald-200 bg-emerald-50/10' : 'border-slate-200 hover:border-emerald-400 bg-slate-50'
@@ -220,7 +235,6 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
               <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,application/pdf" multiple />
             </div>
 
-            {/* AI Extraction Display */}
             <div className="bg-slate-900 rounded-[32px] p-8 text-emerald-400 font-mono text-[11px] overflow-y-auto max-h-[350px] border border-slate-800 shadow-2xl">
               <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
                 <p className="text-white font-black uppercase tracking-[0.2em] text-[10px]">Log Analisa Gemini AI</p>
