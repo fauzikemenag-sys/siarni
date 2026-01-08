@@ -3,30 +3,29 @@
 
 Sistem informasi berbasis Hybrid Cloud untuk pengarsipan digital akta nikah di 31 kecamatan Kabupaten Jember.
 
-## 📋 Data Konfigurasi Vercel (Cheat Sheet)
+## 📋 Konfigurasi Environment Variables (Vercel)
 
-Salin nilai di bawah ini ke tab **Environment Variables** di Vercel:
+Untuk menjalankan aplikasi ini, Anda **WAJIB** mengisi Environment Variables di dashboard Vercel. Jangan membagikan kunci ini kepada siapapun.
 
-| Key | Value |
-| :--- | :--- |
-| **`API_KEY`** | `AIzaSyAcPMFedkLJTlmPkZ24-ZmFrsz6oYM0XHg` |
-| **`SUPABASE_URL`** | `https://czhbmqhvawuhshaojllx.supabase.co` |
-| **`SUPABASE_ANON_KEY`** | `sb_publishable_Lvj4J-ZiCVZZUJ3U9UEXrA_vdKf9gdd` |
+| Key | Deskripsi | Link Dapatkan Kunci |
+| :--- | :--- | :--- |
+| **`API_KEY`** | Google Gemini AI Key | [Dapatkan di AI Studio](https://aistudio.google.com/) |
+| **`SUPABASE_URL`** | URL Project Supabase Anda | [Dashboard Supabase](https://supabase.com/) |
+| **`SUPABASE_ANON_KEY`** | API Key Anon Supabase | [Dashboard Supabase](https://supabase.com/) |
 
 ---
 
-## 🚀 Langkah Deploy Terakhir
-1. Buka dashboard Vercel proyek Anda.
-2. Masuk ke **Settings > Environment Variables**.
-3. Masukkan ke-3 kunci di atas satu per satu (Klik **Add** setelah mengisi tiap baris).
-4. Klik tab **Deployments**.
-5. Klik **titik tiga (...)** pada deployment terbaru, pilih **Redeploy**.
-6. Status di halaman Login aplikasi akan berubah menjadi **ONLINE** (Hijau/Biru).
+## 🚀 Langkah Perbaikan Jika API Key "Leaked"
+1. Buka [Google AI Studio](https://aistudio.google.com/).
+2. Buat **API Key baru**.
+3. Masuk ke Dashboard Vercel > **Settings > Environment Variables**.
+4. Update nilai `API_KEY` dengan kunci yang baru.
+5. Pergi ke tab **Deployments**, klik titik tiga pada deployment terakhir, lalu pilih **Redeploy**.
 
 ---
 
 ## 🛠️ Database Setup (SQL Editor Supabase)
-Pastikan Anda sudah menjalankan ini di SQL Editor Supabase:
+Jalankan perintah ini di SQL Editor Supabase untuk membuat tabel:
 ```sql
 CREATE TABLE marriage_records (
   id UUID PRIMARY KEY,
@@ -50,11 +49,6 @@ CREATE TABLE marriage_records (
   lokasiSimpan TEXT
 );
 ```
-
-## 🛡️ Fitur Keamanan
-- **SHA-256 Digital Signature**: Memastikan data tidak dimanipulasi.
-- **Offline Fallback**: Menyimpan lokal jika internet putus.
-- **Gemini AI OCR**: Ekstraksi otomatis dari foto scan.
 
 ---
 **Pemerintah Kabupaten Jember**

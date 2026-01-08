@@ -1,36 +1,20 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-/**
- * Fungsi pembantu untuk mengambil variabel lingkungan secara aman
- * di berbagai environment (Vercel, Vite, local).
- */
 const getEnv = (key: string) => {
   const viteKey = `VITE_${key}`;
-  
   if (typeof process !== 'undefined' && process.env && process.env[key]) return process.env[key];
   if (typeof process !== 'undefined' && process.env && process.env[viteKey]) return process.env[viteKey];
-
   try {
     const metaEnv = (import.meta as any).env;
     if (metaEnv && metaEnv[viteKey]) return metaEnv[viteKey];
     if (metaEnv && metaEnv[key]) return metaEnv[key];
   } catch (e) {}
-  
-  try {
-    const winProc = (window as any).process;
-    if (winProc?.env && winProc.env[key]) return winProc.env[key];
-    if (winProc?.env && winProc.env[viteKey]) return winProc.env[viteKey];
-  } catch (e) {}
-
   return '';
 };
 
 const getAiClient = () => {
   const apiKey = getEnv('API_KEY');
-  if (!apiKey) {
-    console.warn("API_KEY tidak ditemukan di environment variables.");
-  }
   return new GoogleGenAI({ apiKey: apiKey });
 };
 
@@ -39,10 +23,6 @@ export interface DocumentPart {
   mimeType: string;
 }
 
-/**
- * Ekstrak data akta nikah menggunakan Gemini 3 Flash.
- * Dioptimalkan untuk dokumen Indonesia dan format tanggal.
- */
 export const extractMarriageDataBatch = async (documents: DocumentPart[]) => {
   try {
     const ai = getAiClient();
@@ -59,16 +39,7 @@ export const extractMarriageDataBatch = async (documents: DocumentPart[]) => {
         parts: [
           ...documentParts,
           {
-            text: `Analisa foto dokumen Akta Nikah/Buku Nikah dari Indonesia ini. 
-            Ekstrak informasi berikut dengan akurat:
-            1. Nama Lengkap Suami
-            2. Nama Lengkap Istri
-            3. Tanggal Pernikahan (konversi ke format YYYY-MM-DD, contoh: 03 Januari 2025 menjadi 2025-01-03)
-            4. Nomor NB (Nomor Berkas/Perforasi di pojok)
-            5. Nomor Akta Nikah (Nomor pendaftaran resmi)
-            6. Transkrip lengkap teks yang ada di dokumen.
-
-            PENTING: Jika ada informasi yang tidak terbaca, kosongkan saja stringnya (null/empty).`,
+            text: `Analisa dokumen Akta Nikah Indonesia. Ekstrak: husbandName, wifeName, marriageDate (YYYY-MM-DD), nomorNB, nomorAkta, fullText.`,
           },
         ],
       },
@@ -84,19 +55,24 @@ export const extractMarriageDataBatch = async (documents: DocumentPart[]) => {
             nomorAkta: { type: Type.STRING },
             fullText: { type: Type.STRING },
           },
-          // Jangan buat field menjadi 'required' agar tidak error jika satu field tidak terbaca
         },
       },
     });
 
     const text = response.text;
-    if (!text) throw new Error("AI memberikan respon kosong (mungkin terblokir filter keamanan)");
-    
+    if (!text) throw new Error("Respon AI kosong.");
     return JSON.parse(text);
   } catch (error: any) {
-    console.error("Gemini Extraction Detail Error:", error);
-    // Berikan pesan error yang lebih spesifik jika memungkinkan
-    const errorMessage = error?.message || "Unknown AI Error";
-    throw new Error(errorMessage);
+    console.error("Gemini Error:", error);
+    
+    // Deteksi error spesifik dari Google
+    const msg = error?.message || "";
+    if (msg.includes("API key was reported as leaked")) {
+      throw new Error("KEAMANAN: API Key Anda telah bocor dan diblokir oleh Google. Silakan buat API Key baru di AI Studio dan update di Vercel.");
+    } else if (msg.includes("API key not found")) {
+      throw new Error("Konfigurasi API Key tidak ditemukan. Pastikan variabel API_KEY sudah diset di Vercel.");
+    }
+    
+    throw new Error(msg || "Gagal ekstraksi AI.");
   }
 };
