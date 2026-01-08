@@ -1,23 +1,34 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { MarriageRecord } from '../types.ts';
 import { STORAGE_KEY } from '../constants.ts';
 
-// Helper to access environment variables from various sources
 const getEnv = (key: string) => {
-  // Mencoba berbagai sumber variabel lingkungan (Vite/Browser/Vercel)
-  // Fix: Cast import.meta to any to resolve property 'env' does not exist error in TypeScript environment
-  return (
-    process.env[key] || 
-    ((import.meta as any).env?.[`VITE_${key}`]) || 
-    (window as any)._env_?.[key] || 
-    ''
-  );
+  // Coba akses langsung (untuk Vercel/Vite build)
+  const viteKey = `VITE_${key}`;
+  
+  if (typeof process !== 'undefined' && process.env) {
+    if (process.env[key]) return process.env[key];
+    if (process.env[viteKey]) return process.env[viteKey];
+  }
+
+  // Jika menggunakan import.meta (Vite standar)
+  try {
+    const metaEnv = (import.meta as any).env;
+    if (metaEnv) {
+      if (metaEnv[viteKey]) return metaEnv[viteKey];
+      if (metaEnv[key]) return metaEnv[key];
+    }
+  } catch (e) {}
+  
+  return '';
 };
 
 const SUPABASE_URL = getEnv('SUPABASE_URL');
 const SUPABASE_KEY = getEnv('SUPABASE_ANON_KEY');
 
-const isCloudEnabled = !!(SUPABASE_URL && SUPABASE_KEY);
+// Sangat penting: URL harus mengandung 'supabase.co' agar valid
+const isCloudEnabled = !!(SUPABASE_URL && SUPABASE_KEY && SUPABASE_URL.includes('supabase.co'));
 
 export const supabase = isCloudEnabled 
   ? createClient(SUPABASE_URL, SUPABASE_KEY) 
@@ -36,7 +47,7 @@ export const db = {
         if (data) return data as MarriageRecord[];
       }
     } catch (e) {
-      console.error("Gagal mengambil data dari Cloud:", e);
+      console.error("Cloud fetch failed, using local fallback:", e);
     }
     
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -44,23 +55,29 @@ export const db = {
   },
 
   async saveRecord(record: MarriageRecord): Promise<boolean> {
+    // 1. Selalu simpan lokal dulu (Offline-first)
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       const records = saved ? JSON.parse(saved) : [];
       localStorage.setItem(STORAGE_KEY, JSON.stringify([record, ...records]));
     } catch (e) {
-      console.error("Gagal simpan lokal:", e);
+      console.error("Local save failed:", e);
     }
 
+    // 2. Jika cloud aktif, sinkronkan
     if (supabase) {
       try {
         const { error } = await supabase
           .from('marriage_records')
           .insert([record]);
         
-        return !error;
+        if (error) {
+          console.warn("Supabase Sync Error:", error.message);
+          return false;
+        }
+        return true;
       } catch (e) {
-        console.error("Gagal sinkronisasi ke Cloud:", e);
+        console.error("Cloud sync failed:", e);
         return false;
       }
     }

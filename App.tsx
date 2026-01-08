@@ -38,7 +38,6 @@ const App: React.FC = () => {
           }
         }
 
-        // Cek Parameter Verifikasi di URL
         const urlParams = new URLSearchParams(window.location.search);
         const verifyHash = urlParams.get('verify');
         
@@ -88,7 +87,6 @@ const App: React.FC = () => {
     setActiveTab('archive');
   };
 
-  // Tampilan Loading Utama
   if (isLoading || isVerifying) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -100,7 +98,6 @@ const App: React.FC = () => {
     );
   }
 
-  // Tampilan Error Verifikasi Scan QR
   if (verifyError) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -121,7 +118,6 @@ const App: React.FC = () => {
     );
   }
 
-  // Tampilan Hasil Verifikasi Scan QR (Publik)
   if (publicVerifyRecord) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -170,15 +166,11 @@ const App: React.FC = () => {
               Tutup Verifikasi
             </button>
           </div>
-          <div className="bg-slate-50 p-4 text-center">
-            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">SI-ARNI Jember • Sistem Kearsipan Digital</p>
-          </div>
         </div>
       </div>
     );
   }
 
-  // Tampilan Login
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 relative overflow-hidden">
@@ -246,9 +238,24 @@ const App: React.FC = () => {
             </button>
           </form>
           
-          <p className="text-center text-slate-500 text-[10px] mt-10 uppercase tracking-widest font-bold">
-            Cloud Mode: {db.isOnline() ? 'ONLINE (SUPABASE)' : 'LOCAL ONLY'}
-          </p>
+          <div className="mt-8 text-center p-4 rounded-2xl bg-black/20 border border-white/5">
+            {db.isOnline() ? (
+              <p className="text-emerald-400 text-[10px] uppercase tracking-widest font-black flex items-center justify-center gap-2">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                Database Mode: ONLINE (SUPABASE)
+              </p>
+            ) : (
+              <div className="space-y-1">
+                <p className="text-amber-400 text-[10px] uppercase tracking-widest font-black flex items-center justify-center gap-2">
+                  <i className="fas fa-exclamation-triangle"></i>
+                  Database Mode: LOCAL ONLY
+                </p>
+                <p className="text-[8px] text-slate-500 font-medium uppercase leading-tight px-4">
+                  Data hanya tersimpan di browser ini. Tambahkan SUPABASE_URL & SUPABASE_ANON_KEY di Vercel untuk mengaktifkan Cloud.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -270,10 +277,16 @@ const App: React.FC = () => {
               {activeTab === 'dashboard' && 'Beranda Utama'}
               {activeTab === 'archive' && 'Manajemen Arsip'}
               {activeTab === 'upload' && 'Pencatatan Baru'}
-              {db.isOnline() && (
+              
+              {db.isOnline() ? (
                 <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] rounded-full font-black uppercase tracking-widest shadow-sm">
                   <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                  Cloud Active
+                  Cloud Connected
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-700 text-[10px] rounded-full font-black uppercase tracking-widest shadow-sm">
+                  <i className="fas fa-hdd text-[8px]"></i>
+                  Local Mode
                 </span>
               )}
             </h2>
