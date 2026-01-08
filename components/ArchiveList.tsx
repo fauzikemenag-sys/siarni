@@ -30,12 +30,6 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ records, user }) => {
     if (records.length > 0) checkAll();
   }, [records]);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const isPdf = (data: string) => data?.startsWith('data:application/pdf');
-
   const filtered = records.filter(r => {
     const term = searchTerm.toLowerCase();
     const matchSearch = 
@@ -46,6 +40,38 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ records, user }) => {
     const matchKec = selectedKec === 'Semua' || r.kecamatan === selectedKec;
     return matchSearch && matchKec;
   });
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const exportToCSV = () => {
+    if (filtered.length === 0) return;
+    
+    const headers = ["No", "Suami", "Istri", "Kecamatan", "Nomor NB", "Nomor Akta", "Tahun", "Lokasi Simpan", "Bok", "Digital Signature"];
+    const csvRows = filtered.map((r, i) => [
+      i + 1,
+      `"${r.husbandName.toUpperCase()}"`,
+      `"${r.wifeName.toUpperCase()}"`,
+      r.kecamatan,
+      `'${r.nomorNB}`,
+      `'${r.nomorAkta}`,
+      r.tahun,
+      `"${r.lokasiSimpan}"`,
+      r.nomorBok || '-',
+      r.hash
+    ]);
+
+    const csvContent = [headers, ...csvRows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Arsip_Jember_${selectedKec}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.click();
+  };
+
+  const isPdf = (data: string) => data?.startsWith('data:application/pdf');
 
   const getVerifyLink = (hash: string) => {
     const base = window.location.origin + window.location.pathname;
@@ -66,28 +92,39 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ records, user }) => {
   return (
     <div className="space-y-6">
       {/* Search & Filter */}
-      <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center justify-between no-print">
-        <div className="relative w-full md:w-96">
-          <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-          <input
-            type="text"
-            placeholder="Cari Nama Pasangan atau Nomor Akta..."
-            className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-200 flex flex-col xl:flex-row gap-4 items-center justify-between no-print">
+        <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto items-center">
+          <div className="relative w-full md:w-96">
+            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input
+              type="text"
+              placeholder="Cari Nama Pasangan atau Nomor Akta..."
+              className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-medium transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          {isAdminKab && (
+            <select
+              className="w-full md:w-64 px-4 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-bold cursor-pointer"
+              value={selectedKec}
+              onChange={(e) => setSelectedKec(e.target.value)}
+            >
+              <option value="Semua">Seluruh Jember</option>
+              {KECAMATAN_JEMBER.map(k => <option key={k} value={k}>{k}</option>)}
+            </select>
+          )}
         </div>
-        
-        {isAdminKab && (
-          <select
-            className="w-full md:w-64 px-4 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-bold cursor-pointer"
-            value={selectedKec}
-            onChange={(e) => setSelectedKec(e.target.value)}
-          >
-            <option value="Semua">Seluruh Jember</option>
-            {KECAMATAN_JEMBER.map(k => <option key={k} value={k}>{k}</option>)}
-          </select>
-        )}
+
+        <button 
+          onClick={exportToCSV}
+          disabled={filtered.length === 0}
+          className="w-full xl:w-auto px-8 py-3.5 bg-white text-slate-700 border border-slate-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-sm disabled:opacity-50"
+        >
+          <i className="fas fa-file-csv text-emerald-500 text-lg"></i>
+          Export CSV
+        </button>
       </div>
 
       {/* Table Section */}
@@ -141,6 +178,11 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ records, user }) => {
                   </td>
                 </tr>
               ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">Data tidak ditemukan</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -188,76 +230,93 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ records, user }) => {
             <div className={`overflow-y-auto flex-1 thin-scrollbar ${previewMode === 'PRINT_PREVIEW' ? 'bg-slate-100 p-8 flex justify-center' : 'p-10 md:p-14'}`}>
               
               {previewMode === 'PRINT_PREVIEW' ? (
-                <div className="bg-white w-full max-w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl relative printable-page border border-slate-200">
-                   <div className="mb-10 text-center border-b-[6px] border-double border-slate-900 pb-8">
-                      <h1 className="text-[16px] font-black uppercase tracking-tight text-slate-900">Kementerian Agama Republik Indonesia</h1>
-                      <h2 className="text-[14px] font-extrabold uppercase text-slate-800 leading-tight">Kantor Urusan Agama Kecamatan {viewRecord.kecamatan}</h2>
-                      <p className="text-[10px] font-bold text-slate-600 mt-1">Kabupaten Jember, Provinsi Jawa Timur</p>
-                      <div className="mt-8 inline-block border-2 border-slate-900 px-10 py-2 text-[12px] font-black tracking-[0.4em] uppercase bg-slate-50">
-                        Lembar Kendali Arsip
-                      </div>
+                <div className="bg-white w-full max-w-[210mm] min-h-[297mm] p-[20mm] shadow-2xl relative printable-page border border-slate-200 overflow-hidden">
+                   
+                   {/* WATERMARK DIGITAL SI-ARNI */}
+                   <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none z-0 overflow-hidden print:opacity-[0.07]">
+                      <span className="text-[120px] font-black uppercase tracking-[0.5em] rotate-[-45deg] whitespace-nowrap text-slate-900">
+                        SI-ARNI JEMBER
+                      </span>
                    </div>
 
-                   <div className="grid grid-cols-2 gap-10 mb-10">
-                      <div className="space-y-5">
-                        <div className="border-l-4 border-slate-900 pl-4 py-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Pasangan</label>
-                          <p className="text-[12px] font-black text-slate-900 uppercase leading-snug">{viewRecord.husbandName} &<br/>{viewRecord.wifeName}</p>
+                   <div className="relative z-10">
+                     <div className="mb-10 text-center border-b-[6px] border-double border-slate-900 pb-8">
+                        <h1 className="text-[16px] font-black uppercase tracking-tight text-slate-900">Kementerian Agama Republik Indonesia</h1>
+                        <h2 className="text-[14px] font-extrabold uppercase text-slate-800 leading-tight">Kantor Urusan Agama Kecamatan {viewRecord.kecamatan}</h2>
+                        <p className="text-[10px] font-bold text-slate-600 mt-1">Kabupaten Jember, Provinsi Jawa Timur</p>
+                        <div className="mt-8 inline-block border-2 border-slate-900 px-10 py-2 text-[12px] font-black tracking-[0.4em] uppercase bg-slate-50">
+                          Lembar Kendali Arsip
                         </div>
-                        <div className="border-l-4 border-slate-200 pl-4 py-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nomor Akta Nikah</label>
-                          <p className="text-[11px] font-bold text-slate-700">{viewRecord.nomorAkta}</p>
-                        </div>
-                        <div className="border-l-4 border-slate-200 pl-4 py-1">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Informasi Box</label>
-                          <p className="text-[11px] font-bold text-slate-700">{viewRecord.lokasiSimpan} / BOK {viewRecord.nomorBok || '-'}</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <div className="p-3 border-2 border-slate-100 rounded-2xl bg-slate-50">
-                          <img src={getQrUrl(viewRecord.hash)} className="w-28 h-28" alt="QR" />
-                        </div>
-                        <p className="text-[7px] font-mono text-slate-400 mt-3 max-w-[150px] text-right break-all uppercase leading-tight">{viewRecord.hash}</p>
-                      </div>
-                   </div>
-
-                   <div className="space-y-10">
-                     <h4 className="text-[10px] font-black text-slate-900 border-b-2 border-slate-900 pb-2 uppercase tracking-[0.2em] flex justify-between">
-                       <span>Lampiran Digital Berkas</span>
-                       <span className="text-[9px] font-bold text-slate-400">{viewRecord.images?.length || 0} Halaman</span>
-                     </h4>
-                     {viewRecord.images?.map((file, i) => (
-                        <div key={i} className="mb-10 break-inside-avoid border border-slate-100 p-2 rounded-xl">
-                           <div className="text-[8px] font-black text-slate-400 mb-3 uppercase tracking-widest flex justify-between">
-                              <span>Halaman {i + 1}</span>
-                              <span className="italic">{isPdf(file) ? 'FORMAT: PDF' : 'FORMAT: GAMBAR'}</span>
-                           </div>
-                           {isPdf(file) ? (
-                             <div className="aspect-[4/3] w-full border-2 border-dashed border-slate-300 flex flex-col items-center justify-center bg-slate-50 rounded-2xl">
-                               <i className="fas fa-file-pdf text-4xl text-red-500 mb-3 opacity-30"></i>
-                               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Berkas PDF Terlampir Digital</p>
-                               <p className="text-[8px] text-slate-300 mt-1">Verifikasi QR untuk melihat file asli</p>
-                             </div>
-                           ) : (
-                             <img src={file} className="w-full h-auto grayscale contrast-125" alt={`Page ${i+1}`} />
-                           )}
-                        </div>
-                     ))}
-                   </div>
-
-                   <div className="mt-20 flex justify-between page-break-before-auto">
-                     <div className="text-center w-1/3">
-                        <p className="text-[10px] font-bold text-slate-500">Petugas KUA,</p>
-                        <div className="h-16 flex items-center justify-center opacity-10">
-                          <i className="fas fa-signature text-4xl"></i>
-                        </div>
-                        <p className="text-[10px] font-black text-slate-900 uppercase border-b-2 border-slate-900 inline-block px-4">{viewRecord.uploadedBy}</p>
                      </div>
-                     <div className="text-center w-1/3">
-                        <p className="text-[10px] font-bold text-slate-500">Jember, {new Date().toLocaleDateString('id-ID', {dateStyle: 'long'})}</p>
-                        <p className="text-[10px] font-bold text-slate-500 mt-1">Saksi Arsip,</p>
-                        <div className="h-16"></div>
-                        <p className="text-[10px] font-black text-slate-900 uppercase border-b-2 border-slate-900 inline-block px-8">________________</p>
+
+                     <div className="grid grid-cols-2 gap-10 mb-10">
+                        <div className="space-y-5">
+                          <div className="border-l-4 border-slate-900 pl-4 py-1">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Pasangan</label>
+                            <p className="text-[12px] font-black text-slate-900 uppercase leading-snug">{viewRecord.husbandName} &<br/>{viewRecord.wifeName}</p>
+                          </div>
+                          <div className="border-l-4 border-slate-200 pl-4 py-1">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Nomor Akta Nikah</label>
+                            <p className="text-[11px] font-bold text-slate-700">{viewRecord.nomorAkta}</p>
+                          </div>
+                          <div className="border-l-4 border-slate-200 pl-4 py-1">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Informasi Box</label>
+                            <p className="text-[11px] font-bold text-slate-700">{viewRecord.lokasiSimpan} / BOK {viewRecord.nomorBok || '-'}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <div className="p-3 border-2 border-slate-100 rounded-2xl bg-slate-50">
+                            <img src={getQrUrl(viewRecord.hash)} className="w-28 h-28" alt="QR" />
+                          </div>
+                          <p className="text-[7px] font-mono text-slate-400 mt-3 max-w-[150px] text-right break-all uppercase leading-tight">{viewRecord.hash}</p>
+                        </div>
+                     </div>
+
+                     <div className="space-y-10">
+                       <h4 className="text-[10px] font-black text-slate-900 border-b-2 border-slate-900 pb-2 uppercase tracking-[0.2em] flex justify-between">
+                         <span>Lampiran Digital Berkas</span>
+                         <span className="text-[9px] font-bold text-slate-400">{viewRecord.images?.length || 0} Halaman</span>
+                       </h4>
+                       {viewRecord.images?.map((file, i) => (
+                          <div key={i} className="mb-10 break-inside-avoid border border-slate-100 p-2 rounded-xl relative overflow-hidden">
+                             {/* Mini Watermark for each attachment */}
+                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.05] -rotate-12 pointer-events-none select-none text-[40px] font-black text-slate-900 uppercase whitespace-nowrap z-0">
+                                SI-ARNI JEMBER
+                             </div>
+                             
+                             <div className="relative z-10">
+                               <div className="text-[8px] font-black text-slate-400 mb-3 uppercase tracking-widest flex justify-between">
+                                  <span>Halaman {i + 1}</span>
+                                  <span className="italic">{isPdf(file) ? 'FORMAT: PDF' : 'FORMAT: GAMBAR'}</span>
+                               </div>
+                               {isPdf(file) ? (
+                                 <div className="aspect-[4/3] w-full border-2 border-dashed border-slate-300 flex flex-col items-center justify-center bg-slate-50 rounded-2xl">
+                                   <i className="fas fa-file-pdf text-4xl text-red-500 mb-3 opacity-30"></i>
+                                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Berkas PDF Terlampir Digital</p>
+                                   <p className="text-[8px] text-slate-300 mt-1">Verifikasi QR untuk melihat file asli</p>
+                                 </div>
+                               ) : (
+                                 <img src={file} className="w-full h-auto grayscale contrast-125" alt={`Page ${i+1}`} />
+                               )}
+                             </div>
+                          </div>
+                       ))}
+                     </div>
+
+                     <div className="mt-20 flex justify-between page-break-before-auto relative z-10">
+                       <div className="text-center w-1/3">
+                          <p className="text-[10px] font-bold text-slate-500">Petugas KUA,</p>
+                          <div className="h-16 flex items-center justify-center opacity-10">
+                            <i className="fas fa-signature text-4xl"></i>
+                          </div>
+                          <p className="text-[10px] font-black text-slate-900 uppercase border-b-2 border-slate-900 inline-block px-4">{viewRecord.uploadedBy}</p>
+                       </div>
+                       <div className="text-center w-1/3">
+                          <p className="text-[10px] font-bold text-slate-500">Jember, {new Date().toLocaleDateString('id-ID', {dateStyle: 'long'})}</p>
+                          <p className="text-[10px] font-bold text-slate-500 mt-1">Saksi Arsip,</p>
+                          <div className="h-16"></div>
+                          <p className="text-[10px] font-black text-slate-900 uppercase border-b-2 border-slate-900 inline-block px-8">________________</p>
+                       </div>
                      </div>
                    </div>
                 </div>
@@ -378,11 +437,11 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ records, user }) => {
         @media print {
           body * { visibility: hidden; }
           .printable-content, .printable-content * { visibility: visible; }
-          .printable-content { position: absolute; left: 0; top: 0; width: 100%; border: none !important; margin: 0 !important; }
+          .printable-content { position: absolute; left: 0; top: 0; width: 100%; border: none !important; margin: 0 !important; padding: 0 !important; background: white !important; }
           .no-print { display: none !important; }
           .print-only { display: block !important; }
           .modal-overlay { background: white !important; padding: 0 !important; }
-          .printable-page { box-shadow: none !important; border: none !important; margin: 0 !important; width: 100% !important; }
+          .printable-page { box-shadow: none !important; border: none !important; margin: 0 !important; width: 100% !important; overflow: hidden !important; }
         }
         .thin-scrollbar::-webkit-scrollbar { width: 6px; }
         .thin-scrollbar::-webkit-scrollbar-track { background: transparent; }

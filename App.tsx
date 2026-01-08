@@ -13,14 +13,10 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [records, setRecords] = useState<MarriageRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loginForm, setLoginForm] = useState({ username: '', password: '', role: 'ADMIN_KECAMATAN' as Role, kecamatan: KECAMATAN_JEMBER[0] });
   
-  // State Verifikasi Publik
-  const [publicVerifyRecord, setPublicVerifyRecord] = useState<{record: MarriageRecord, isValid: boolean} | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   useEffect(() => {
     const initData = async () => {
@@ -45,16 +41,12 @@ const App: React.FC = () => {
           setIsVerifying(true);
           const found = data.find(r => r.hash === verifyHash);
           if (found) {
-            const isValid = await verifyRecordIntegrity(found);
-            setPublicVerifyRecord({ record: found, isValid });
-          } else {
-            setVerifyError("Data arsip dengan sidik jari digital tersebut tidak ditemukan di database Jember.");
+            await verifyRecordIntegrity(found);
           }
           setIsVerifying(false);
         }
       } catch (err) {
-        console.error("Initialization error:", err);
-        setError("Gagal memuat aplikasi. Pastikan koneksi internet stabil.");
+        console.error("Init error:", err);
       } finally {
         setIsLoading(false);
       }
@@ -89,142 +81,72 @@ const App: React.FC = () => {
 
   if (isLoading || isVerifying) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-emerald-500 font-bold animate-pulse">Menghubungkan ke Server Jember...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (verifyError) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white p-10 rounded-[40px] shadow-2xl max-w-md w-full text-center border border-slate-200">
-          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">
-            <i className="fas fa-search-minus"></i>
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800 mb-4">Data Tidak Ditemukan</h2>
-          <p className="text-slate-500 mb-8 leading-relaxed">{verifyError}</p>
-          <button 
-            onClick={() => { window.history.pushState({}, '', window.location.pathname); setVerifyError(null); }}
-            className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-slate-800 transition-all"
-          >
-            Kembali ke Aplikasi
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (publicVerifyRecord) {
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-[40px] shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
-          <div className={`${publicVerifyRecord.isValid ? 'bg-emerald-600' : 'bg-red-600'} p-10 text-center text-white`}>
-            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-md">
-              <i className={`fas ${publicVerifyRecord.isValid ? 'fa-check-circle' : 'fa-times-circle'} text-4xl`}></i>
-            </div>
-            <h1 className="text-2xl font-black uppercase tracking-tight">Verifikasi Digital</h1>
-            <p className="text-xs opacity-90 uppercase tracking-widest font-bold mt-1">
-              {publicVerifyRecord.isValid ? 'Dokumen Terverifikasi Asli' : 'DOKUMEN TIDAK VALID / DIMANIPULASI'}
-            </p>
-          </div>
-          
-          <div className="p-10 space-y-6">
-            <div className="grid grid-cols-1 gap-4 text-sm bg-slate-50 p-6 rounded-3xl">
-              <div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Nama Pasangan</p>
-                <p className="font-black text-slate-800 uppercase">{publicVerifyRecord.record.husbandName} & {publicVerifyRecord.record.wifeName}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200">
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">No. Akta</p>
-                  <p className="font-bold text-slate-700">{publicVerifyRecord.record.nomorAkta}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Kecamatan</p>
-                  <p className="font-bold text-slate-700">{publicVerifyRecord.record.kecamatan}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4">
-              <p className="text-[10px] text-slate-400 font-bold uppercase mb-2 flex items-center gap-2">
-                <i className="fas fa-fingerprint text-emerald-500"></i> Digital Signature (SHA-256)
-              </p>
-              <div className="bg-slate-900 p-4 rounded-2xl font-mono text-[9px] break-all text-emerald-500/80 border border-slate-800 leading-tight">
-                {publicVerifyRecord.record.hash}
-              </div>
-            </div>
-
-            <button 
-              onClick={() => { window.history.pushState({}, '', window.location.pathname); setPublicVerifyRecord(null); }}
-              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg"
-            >
-              Tutup Verifikasi
-            </button>
-          </div>
+          <div className="w-12 h-12 border-4 border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-emerald-500 text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">Menghubungkan Infrastruktur Jember...</p>
         </div>
       </div>
     );
   }
 
   if (!user) {
+    const isAiOnline = !!process.env.API_KEY;
+    const isDbOnline = db.isOnline();
+    
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 relative overflow-hidden">
-        <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-blue-600/10 rounded-full blur-3xl"></div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 relative overflow-hidden font-sans">
+        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-600/5 rounded-full blur-[120px]"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[120px]"></div>
 
-        <div className="bg-white/10 backdrop-blur-xl p-8 rounded-[40px] border border-white/10 w-full max-w-md relative z-10 shadow-2xl">
+        <div className="bg-white/[0.02] backdrop-blur-3xl p-10 rounded-[48px] border border-white/10 w-full max-w-md relative z-10 shadow-2xl">
           <div className="text-center mb-10">
-            <div className="w-24 h-24 bg-white rounded-3xl mx-auto flex items-center justify-center shadow-xl shadow-emerald-500/10 mb-6 p-4">
+            <div className="w-20 h-20 bg-white rounded-[28px] mx-auto flex items-center justify-center shadow-2xl shadow-emerald-500/20 mb-6 p-4 border border-white/20">
               <img 
                 src="https://www.freepnglogos.com/uploads/logo-kemenag-png/logo-kementerian-agama-gambar-logo-depag-png-0.png" 
-                alt="Kemenag Logo" 
+                alt="Kemenag" 
                 className="w-full h-full object-contain"
               />
             </div>
-            <h1 className="text-3xl font-black text-white mb-2 tracking-tight">SI-ARNI Jember</h1>
-            <p className="text-slate-400 text-sm">Sistem Informasi Pengarsipan Akta Nikah</p>
+            <h1 className="text-2xl font-black text-white mb-2 tracking-tight uppercase">SI-ARNI Jember</h1>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Sistem Arsip Akta Nikah Digital</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Username</label>
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Username Admin</label>
               <input
                 type="text"
-                className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-600 font-medium"
-                placeholder="Masukkan username"
+                className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-700 font-bold"
+                placeholder="Contoh: Admin_KUA"
                 required
                 value={loginForm.username}
                 onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Akses Sebagai</label>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Level Akses</label>
               <select
-                className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all cursor-pointer font-medium"
+                className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all cursor-pointer font-bold"
                 value={loginForm.role}
                 onChange={(e) => setLoginForm({...loginForm, role: e.target.value as Role})}
               >
-                <option value="ADMIN_KECAMATAN" className="bg-slate-800">Admin KUA Kecamatan</option>
-                <option value="ADMIN_KABUPATEN" className="bg-slate-800">Admin Kabupaten Jember</option>
+                <option value="ADMIN_KECAMATAN" className="bg-slate-900">Admin Kecamatan (KUA)</option>
+                <option value="ADMIN_KABUPATEN" className="bg-slate-900">Admin Kabupaten (Kemenag)</option>
               </select>
             </div>
 
             {loginForm.role === 'ADMIN_KECAMATAN' && (
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Pilih Kecamatan</label>
+              <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Kecamatan</label>
                 <select
-                  className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all cursor-pointer font-medium"
+                  className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all cursor-pointer font-bold"
                   value={loginForm.kecamatan}
                   onChange={(e) => setLoginForm({...loginForm, kecamatan: e.target.value})}
                 >
                   {KECAMATAN_JEMBER.map(kec => (
-                    <option key={kec} value={kec} className="bg-slate-800">{kec}</option>
+                    <option key={kec} value={kec} className="bg-slate-900">{kec}</option>
                   ))}
                 </select>
               </div>
@@ -232,28 +154,35 @@ const App: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-5 rounded-2xl transition-all shadow-lg shadow-emerald-500/20 mt-4 uppercase tracking-widest"
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-black py-5 rounded-2xl transition-all shadow-xl shadow-emerald-500/20 mt-4 uppercase tracking-[0.2em] text-xs"
             >
-              Masuk Dashboard
+              Masuk Sistem
             </button>
           </form>
           
-          <div className="mt-8 text-center p-4 rounded-2xl bg-black/20 border border-white/5">
-            {db.isOnline() ? (
-              <p className="text-emerald-400 text-[10px] uppercase tracking-widest font-black flex items-center justify-center gap-2">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                Database Mode: ONLINE (SUPABASE)
-              </p>
-            ) : (
-              <div className="space-y-1">
-                <p className="text-amber-400 text-[10px] uppercase tracking-widest font-black flex items-center justify-center gap-2">
-                  <i className="fas fa-exclamation-triangle"></i>
-                  Database Mode: LOCAL ONLY
-                </p>
-                <p className="text-[8px] text-slate-500 font-medium uppercase leading-tight px-4">
-                  Data hanya tersimpan di browser ini. Tambahkan SUPABASE_URL & SUPABASE_ANON_KEY di Vercel untuk mengaktifkan Cloud.
-                </p>
+          <div className="mt-10 pt-8 border-t border-white/5 space-y-3">
+            <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] text-center mb-4">Diagnostic System Status</p>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {/* Database Status */}
+              <div className={`p-3 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${isDbOnline ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/10'}`}>
+                <i className={`fas fa-database text-xs ${isDbOnline ? 'text-emerald-500' : 'text-slate-600'}`}></i>
+                <span className={`text-[8px] font-black uppercase tracking-widest ${isDbOnline ? 'text-emerald-500' : 'text-slate-600'}`}>Cloud DB</span>
+                <span className={`text-[7px] font-bold uppercase ${isDbOnline ? 'text-emerald-400' : 'text-slate-500'}`}>{isDbOnline ? 'ONLINE' : 'OFFLINE'}</span>
               </div>
+
+              {/* AI Status */}
+              <div className={`p-3 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${isAiOnline ? 'bg-blue-500/5 border-blue-500/20' : 'bg-red-500/5 border-red-500/10'}`}>
+                <i className={`fas fa-brain text-xs ${isAiOnline ? 'text-blue-500' : 'text-slate-600'}`}></i>
+                <span className={`text-[8px] font-black uppercase tracking-widest ${isAiOnline ? 'text-blue-500' : 'text-slate-600'}`}>Gemini AI</span>
+                <span className={`text-[7px] font-bold uppercase ${isAiOnline ? 'text-blue-400' : 'text-slate-500'}`}>{isAiOnline ? 'ACTIVE' : 'OFFLINE'}</span>
+              </div>
+            </div>
+
+            {(!isDbOnline || !isAiOnline) && (
+              <p className="text-[7px] text-slate-500 text-center font-bold uppercase leading-relaxed mt-2 italic">
+                Pastikan Environment Variables di Vercel sudah di-Redeploy.
+              </p>
             )}
           </div>
         </div>
@@ -262,7 +191,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex bg-slate-50 min-h-screen">
+    <div className="flex bg-slate-50 min-h-screen font-sans">
       <Sidebar 
         user={user} 
         activeTab={activeTab} 
@@ -270,37 +199,31 @@ const App: React.FC = () => {
         onLogout={handleLogout} 
       />
       
-      <main className="flex-1 ml-64 p-8">
-        <header className="flex items-center justify-between mb-8">
+      <main className="flex-1 ml-64 p-10">
+        <header className="flex items-center justify-between mb-10 no-print">
           <div>
-            <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3 tracking-tight">
-              {activeTab === 'dashboard' && 'Beranda Utama'}
-              {activeTab === 'archive' && 'Manajemen Arsip'}
-              {activeTab === 'upload' && 'Pencatatan Baru'}
-              
-              {db.isOnline() ? (
-                <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] rounded-full font-black uppercase tracking-widest shadow-sm">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                  Cloud Connected
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-700 text-[10px] rounded-full font-black uppercase tracking-widest shadow-sm">
-                  <i className="fas fa-hdd text-[8px]"></i>
-                  Local Mode
+            <div className="flex items-center gap-3 mb-1">
+               <h2 className="text-3xl font-black text-slate-800 tracking-tight uppercase">
+                {activeTab === 'dashboard' && 'Beranda'}
+                {activeTab === 'archive' && 'Arsip Digital'}
+                {activeTab === 'upload' && 'Upload Baru'}
+              </h2>
+              {db.isOnline() && (
+                <span className="bg-emerald-100 text-emerald-700 text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest flex items-center gap-1">
+                   <span className="w-1 h-1 bg-emerald-500 rounded-full"></span> Cloud Active
                 </span>
               )}
-            </h2>
+            </div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Pusat Data Akta Nikah Kabupaten Jember</p>
           </div>
           
-          <div className="flex items-center gap-4 no-print">
-            <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm text-xs text-slate-600 font-bold uppercase tracking-wider">
-              <i className="far fa-calendar-alt mr-2 text-emerald-500"></i>
-              {new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
-            </div>
+          <div className="bg-white px-6 py-3 rounded-2xl border border-slate-200 shadow-sm text-[10px] text-slate-600 font-black uppercase tracking-[0.1em]">
+            <i className="far fa-calendar-check mr-2 text-emerald-500"></i>
+            {new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}
           </div>
         </header>
 
-        <div className="animate-in fade-in duration-500">
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
           {activeTab === 'dashboard' && (
             <Dashboard records={records} user={user} />
           )}
