@@ -16,12 +16,38 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loginForm, setLoginForm] = useState({ username: '', password: '', role: 'ADMIN_KECAMATAN' as Role, kecamatan: KECAMATAN_JEMBER[0] });
   
-  const [isVerifying, setIsVerifying] = useState(false);
+  // State Verifikasi Publik (Scan QR)
+  const [verifiedRecord, setVerifiedRecord] = useState<MarriageRecord | null>(null);
+  const [verifyStatus, setVerifyStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS' | 'NOT_FOUND' | 'TAMPERED'>('IDLE');
 
   useEffect(() => {
     const initData = async () => {
       try {
         setIsLoading(true);
+        
+        // Cek apakah ini akses verifikasi dari QR Code (?verify=...)
+        const urlParams = new URLSearchParams(window.location.search);
+        const verifyHash = urlParams.get('verify');
+        
+        if (verifyHash) {
+          setVerifyStatus('LOADING');
+          const found = await db.getRecordByHash(verifyHash);
+          if (found) {
+            const isValid = await verifyRecordIntegrity(found);
+            if (isValid) {
+              setVerifiedRecord(found);
+              setVerifyStatus('SUCCESS');
+            } else {
+              setVerifyStatus('TAMPERED');
+            }
+          } else {
+            setVerifyStatus('NOT_FOUND');
+          }
+          setIsLoading(false);
+          return;
+        }
+
+        // Jalankan inisialisasi normal jika bukan verifikasi
         const data = await db.getAllRecords();
         setRecords(data || []);
         
@@ -32,18 +58,6 @@ const App: React.FC = () => {
           } catch (e) {
             localStorage.removeItem(SESSION_KEY);
           }
-        }
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const verifyHash = urlParams.get('verify');
-        
-        if (verifyHash) {
-          setIsVerifying(true);
-          const found = data.find(r => r.hash === verifyHash);
-          if (found) {
-            await verifyRecordIntegrity(found);
-          }
-          setIsVerifying(false);
         }
       } catch (err) {
         console.error("Init error:", err);
@@ -79,7 +93,81 @@ const App: React.FC = () => {
     setActiveTab('archive');
   };
 
-  if (isLoading || isVerifying) {
+  // Tampilan Verifikasi Publik (Tanpa Login)
+  if (verifyStatus !== 'IDLE') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 font-sans">
+        <div className="w-full max-w-lg animate-in zoom-in duration-500">
+          {verifyStatus === 'LOADING' && (
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin mx-auto mb-6"></div>
+              <p className="text-emerald-500 text-[10px] font-black uppercase tracking-[0.2em]">Menelusuri Database Jember...</p>
+            </div>
+          )}
+
+          {verifyStatus === 'SUCCESS' && verifiedRecord && (
+            <div className="bg-white rounded-[48px] overflow-hidden shadow-2xl">
+              <div className="bg-emerald-500 p-10 text-center text-white relative">
+                 <div className="absolute top-4 right-4 bg-white/20 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Official Verify</div>
+                 <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-4xl mx-auto mb-4 border border-white/30">
+                    <i className="fas fa-check-circle"></i>
+                 </div>
+                 <h2 className="text-2xl font-black uppercase tracking-tight">Terverifikasi Asli</h2>
+                 <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mt-1">Sesuai dengan Data Base Kemenag Jember</p>
+              </div>
+              <div className="p-10 space-y-6">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Pasangan</span>
+                    <p className="text-lg font-black text-slate-800 uppercase">{verifiedRecord.husbandName} & {verifiedRecord.wifeName}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Kecamatan</span>
+                        <p className="text-sm font-bold text-slate-700 uppercase">{verifiedRecord.kecamatan}</p>
+                     </div>
+                     <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Tahun</span>
+                        <p className="text-sm font-bold text-slate-700">{verifiedRecord.tahun}</p>
+                     </div>
+                  </div>
+                  <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800">
+                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest block mb-2">Digital Signature (SHA-256)</span>
+                    <p className="text-[9px] font-mono text-emerald-400/70 break-all leading-relaxed uppercase">{verifiedRecord.hash}</p>
+                  </div>
+                </div>
+                <button onClick={() => window.location.href = window.location.origin + window.location.pathname} className="w-full py-5 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Tutup Verifikasi</button>
+              </div>
+            </div>
+          )}
+
+          {verifyStatus === 'NOT_FOUND' && (
+            <div className="bg-white rounded-[48px] overflow-hidden shadow-2xl p-12 text-center">
+               <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">
+                  <i className="fas fa-search"></i>
+               </div>
+               <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tight mb-2">Data Tidak Ditemukan</h2>
+               <p className="text-slate-500 text-sm mb-8 leading-relaxed">Berkas ini belum disinkronkan ke Cloud atau kuncinya salah. Pastikan Admin KUA sudah terhubung ke internet.</p>
+               <button onClick={() => window.location.href = window.location.origin + window.location.pathname} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest">Kembali</button>
+            </div>
+          )}
+
+          {verifyStatus === 'TAMPERED' && (
+            <div className="bg-red-600 rounded-[48px] overflow-hidden shadow-2xl p-12 text-center text-white">
+               <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">
+                  <i className="fas fa-radiation"></i>
+               </div>
+               <h2 className="text-2xl font-black uppercase tracking-tight mb-2">Data Palsu / Berubah!</h2>
+               <p className="text-white/80 text-sm mb-8 leading-relaxed">Peringatan! Isi berkas digital ini telah dimodifikasi secara ilegal. Digital Signature tidak cocok.</p>
+               <button onClick={() => window.location.href = window.location.origin + window.location.pathname} className="w-full py-5 bg-white text-red-600 rounded-2xl font-black text-[10px] uppercase tracking-widest">Waspada Pemalsuan</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
@@ -164,14 +252,11 @@ const App: React.FC = () => {
             <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] text-center mb-4">Diagnostic System Status</p>
             
             <div className="grid grid-cols-2 gap-3">
-              {/* Database Status */}
               <div className={`p-3 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${isDbOnline ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/10'}`}>
                 <i className={`fas fa-database text-xs ${isDbOnline ? 'text-emerald-500' : 'text-slate-600'}`}></i>
                 <span className={`text-[8px] font-black uppercase tracking-widest ${isDbOnline ? 'text-emerald-500' : 'text-slate-600'}`}>Cloud DB</span>
                 <span className={`text-[7px] font-bold uppercase ${isDbOnline ? 'text-emerald-400' : 'text-slate-500'}`}>{isDbOnline ? 'ONLINE' : 'OFFLINE'}</span>
               </div>
-
-              {/* AI Status */}
               <div className={`p-3 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all ${isAiOnline ? 'bg-blue-500/5 border-blue-500/20' : 'bg-red-500/5 border-red-500/10'}`}>
                 <i className={`fas fa-brain text-xs ${isAiOnline ? 'text-blue-500' : 'text-slate-600'}`}></i>
                 <span className={`text-[8px] font-black uppercase tracking-widest ${isAiOnline ? 'text-blue-500' : 'text-slate-600'}`}>Gemini AI</span>
@@ -179,10 +264,12 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {(!isDbOnline || !isAiOnline) && (
-              <p className="text-[7px] text-slate-500 text-center font-bold uppercase leading-relaxed mt-2 italic">
-                Pastikan Environment Variables di Vercel sudah di-Redeploy.
-              </p>
+            {!isDbOnline && (
+              <div className="bg-amber-500/10 p-4 rounded-2xl border border-amber-500/20">
+                <p className="text-[7px] text-amber-500 font-black uppercase leading-relaxed text-center italic">
+                  PERINGATAN: Cloud Database Offline. Data scan QR tidak akan bisa dilihat dari perangkat lain (HP).
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -208,9 +295,13 @@ const App: React.FC = () => {
                 {activeTab === 'archive' && 'Arsip Digital'}
                 {activeTab === 'upload' && 'Upload Baru'}
               </h2>
-              {db.isOnline() && (
+              {db.isOnline() ? (
                 <span className="bg-emerald-100 text-emerald-700 text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest flex items-center gap-1">
                    <span className="w-1 h-1 bg-emerald-500 rounded-full"></span> Cloud Active
+                </span>
+              ) : (
+                <span className="bg-amber-100 text-amber-700 text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest flex items-center gap-1">
+                   <span className="w-1 h-1 bg-amber-500 rounded-full animate-pulse"></span> Local Only (Offline)
                 </span>
               )}
             </div>
