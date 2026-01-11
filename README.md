@@ -5,27 +5,27 @@ Sistem informasi berbasis Hybrid Cloud untuk pengarsipan digital akta nikah di 3
 
 ## 📋 Konfigurasi Environment Variables (Vercel)
 
-Untuk menjalankan aplikasi ini, Anda **WAJIB** mengisi Environment Variables di dashboard Vercel. Jangan membagikan kunci ini kepada siapapun.
+Aplikasi membutuhkan 3 kunci utama agar data bisa tersinkronisasi antara Laptop dan HP (Cloud). Masukkan kunci ini di Settings Vercel Anda:
 
-| Key | Deskripsi | Link Dapatkan Kunci |
-| :--- | :--- | :--- |
-| **`API_KEY`** | Google Gemini AI Key | [Dapatkan di AI Studio](https://aistudio.google.com/) |
-| **`SUPABASE_URL`** | URL Project Supabase Anda | [Dashboard Supabase](https://supabase.com/) |
-| **`SUPABASE_ANON_KEY`** | API Key Anon Supabase | [Dashboard Supabase](https://supabase.com/) |
+| Key | Cara Mendapatkan di Supabase / AI Studio |
+| :--- | :--- |
+| **`SUPABASE_URL`** | Buka Supabase > Project Settings > API. Cari bagian **Project URL**. |
+| **`SUPABASE_ANON_KEY`** | Buka Supabase > Project Settings > API. Cari label **`anon` `public`** (yang berawalan `eyJ...`). |
+| **`API_KEY`** | Buka [Google AI Studio](https://aistudio.google.com/) > Get API Key. |
 
 ---
 
-## 🚀 Langkah Perbaikan Jika API Key "Leaked"
-1. Buka [Google AI Studio](https://aistudio.google.com/).
-2. Buat **API Key baru**.
-3. Masuk ke Dashboard Vercel > **Settings > Environment Variables**.
-4. Update nilai `API_KEY` dengan kunci yang baru.
-5. Pergi ke tab **Deployments**, klik titik tiga pada deployment terakhir, lalu pilih **Redeploy**.
+## 🚀 Mengapa Data Saya Tidak Muncul di HP?
+Jika Anda sudah upload di Laptop tapi tidak muncul saat scan QR di HP, itu karena **Cloud DB masih OFFLINE**. 
+1. Pastikan `SUPABASE_URL` dan `SUPABASE_ANON_KEY` sudah terisi di Vercel.
+2. Lakukan **Redeploy** di Vercel setelah mengubah variabel.
+3. Login kembali di Laptop. Pastikan muncul indikator hijau **"Cloud Active"** di pojok kiri atas dashboard.
+4. Upload ulang berkasnya saat status sudah "Cloud Active".
 
 ---
 
 ## 🛠️ Database Setup (SQL Editor Supabase)
-Jalankan perintah ini di SQL Editor Supabase untuk membuat tabel:
+Pastikan Anda sudah menjalankan perintah ini di **SQL Editor** Supabase agar tabel tersedia:
 ```sql
 CREATE TABLE marriage_records (
   id UUID PRIMARY KEY,
