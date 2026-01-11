@@ -34,6 +34,7 @@ export const supabase = isCloudEnabled
 
 export const db = {
   async getAllRecords(): Promise<MarriageRecord[]> {
+    let cloudData: MarriageRecord[] = [];
     try {
       if (supabase) {
         const { data, error } = await supabase
@@ -41,58 +42,82 @@ export const db = {
           .select('*')
           .order('createdAt', { ascending: false });
         if (error) throw error;
-        if (data) return data as MarriageRecord[];
+        if (data) cloudData = data as MarriageRecord[];
       }
     } catch (e) {
-      console.error("Supabase fail:", e);
+      console.error("Supabase fetch failed:", e);
     }
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
+
+    // Gabungkan data Cloud dan Lokal tanpa duplikat
+    const localSaved = localStorage.getItem(STORAGE_KEY);
+    const localRecords = localSaved ? JSON.parse(localSaved) : [];
+    
+    // Gunakan hash sebagai identitas unik
+    const allRecords = [...cloudData];
+    const seenHashes = new Set(cloudData.map(r => r.hash));
+
+    for (const lr of localRecords) {
+      if (!seenHashes.has(lr.hash)) {
+        allRecords.push(lr);
+        seenHashes.add(lr.hash);
+      }
+    }
+
+    return allRecords.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
 
   async getRecordByHash(hash: string): Promise<MarriageRecord | null> {
-    // 1. Cek Lokal dulu
-    const localSaved = localStorage.getItem(STORAGE_KEY);
-    if (localSaved) {
-      const records = JSON.parse(localSaved) as MarriageRecord[];
-      const found = records.find(r => r.hash === hash);
-      if (found) return found;
-    }
-
-    // 2. Cek Cloud (Penting agar HP bisa lihat data dari Laptop)
+    // 1. Prioritaskan Cloud (agar selalu up-to-date di semua device)
     if (supabase) {
       try {
         const { data, error } = await supabase
           .from('marriage_records')
           .select('*')
           .eq('hash', hash)
-          .single();
+          .maybeSingle();
         if (!error && data) return data as MarriageRecord;
       } catch (e) {
         console.error("Cloud fetch error:", e);
       }
     }
+
+    // 2. Fallback ke Lokal
+    const localSaved = localStorage.getItem(STORAGE_KEY);
+    if (localSaved) {
+      const records = JSON.parse(localSaved) as MarriageRecord[];
+      return records.find(r => r.hash === hash) || null;
+    }
     return null;
   },
 
   async saveRecord(record: MarriageRecord): Promise<boolean> {
-    // Simpan lokal
+    // 1. Selalu simpan lokal dulu demi keamanan offline
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       const records = saved ? JSON.parse(saved) : [];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([record, ...records]));
-    } catch (e) {}
+      // Hindari duplikat di lokal
+      if (!records.some((r: any) => r.hash === record.hash)) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([record, ...records]));
+      }
+    } catch (e) {
+      console.error("Local save failed", e);
+    }
 
-    // Sinkron Cloud
+    // 2. Coba Sinkron Cloud
     if (supabase) {
       try {
         const { error } = await supabase.from('marriage_records').insert([record]);
-        return !error;
+        if (error) {
+          console.error("Supabase Insert Error:", error.message);
+          return false;
+        }
+        return true;
       } catch (e) {
+        console.error("Cloud sync exception", e);
         return false;
       }
     }
-    return true;
+    return false;
   },
 
   isOnline: () => isCloudEnabled

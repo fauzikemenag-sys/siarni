@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { MarriageRecord, User } from '../types';
 import { KECAMATAN_JEMBER } from '../constants';
 import { verifyRecordIntegrity } from '../utils/crypto';
+import { db } from '../services/databaseService';
 
 interface ArchiveListProps {
   records: MarriageRecord[];
@@ -14,6 +15,7 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ records, user }) => {
   const [selectedKec, setSelectedKec] = useState(user.role === 'ADMIN_KABUPATEN' ? 'Semua' : user.kecamatan);
   const [viewRecord, setViewRecord] = useState<MarriageRecord | null>(null);
   const [integrityStatus, setIntegrityStatus] = useState<Record<string, boolean>>({});
+  const [cloudSyncedStatus, setCloudSyncedStatus] = useState<Record<string, boolean>>({});
   const [previewMode, setPreviewMode] = useState<'DETAILS' | 'PRINT_PREVIEW'>('DETAILS');
   const [isProcessingWatermark, setIsProcessingWatermark] = useState(false);
 
@@ -21,11 +23,19 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ records, user }) => {
 
   useEffect(() => {
     const checkAll = async () => {
-      const results: Record<string, boolean> = {};
+      const iResults: Record<string, boolean> = {};
+      const cResults: Record<string, boolean> = {};
+      
+      // Ambil data dari cloud untuk verifikasi keberadaan di server
+      const cloudRecords = await db.getAllRecords();
+      const cloudHashes = new Set(cloudRecords.map(r => r.hash));
+
       for (const record of records) {
-        results[record.id] = await verifyRecordIntegrity(record);
+        iResults[record.id] = await verifyRecordIntegrity(record);
+        cResults[record.id] = cloudHashes.has(record.hash);
       }
-      setIntegrityStatus(results);
+      setIntegrityStatus(iResults);
+      setCloudSyncedStatus(cResults);
     };
     if (records.length > 0) checkAll();
   }, [records]);
@@ -162,7 +172,7 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ records, user }) => {
                 <th className="px-6 py-5 w-16 text-center">No</th>
                 <th className="px-6 py-5">Arsip Akta Nikah</th>
                 <th className="px-6 py-5">Kecamatan</th>
-                <th className="px-6 py-5 text-center">Integritas</th>
+                <th className="px-6 py-5 text-center">Lokasi Simpan</th>
                 <th className="px-6 py-5 text-right">Aksi</th>
               </tr>
             </thead>
@@ -171,16 +181,28 @@ const ArchiveList: React.FC<ArchiveListProps> = ({ records, user }) => {
                 <tr key={record.id} className="hover:bg-slate-50/80 transition-colors group cursor-pointer" onClick={() => openRecord(record)}>
                   <td className="px-6 py-5 text-center text-slate-400 font-mono text-xs">{index + 1}</td>
                   <td className="px-6 py-5">
-                    <p className="font-bold text-slate-800 text-sm uppercase">{record.husbandName} & {record.wifeName}</p>
+                    <div className="flex items-center gap-3 mb-1">
+                       <p className="font-bold text-slate-800 text-sm uppercase">{record.husbandName} & {record.wifeName}</p>
+                       {!integrityStatus[record.id] && (
+                          <span className="bg-red-500 text-white text-[7px] px-1.5 py-0.5 rounded font-black uppercase">Tampered</span>
+                       )}
+                    </div>
                     <p className="text-[10px] text-slate-400 font-medium tracking-tight">Akta: {record.nomorAkta} | Tahun: {record.tahun}</p>
                   </td>
                   <td className="px-6 py-5 text-xs font-bold text-slate-600">{record.kecamatan}</td>
                   <td className="px-6 py-5 text-center">
-                    {integrityStatus[record.id] ? (
-                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full">TERVERIFIKASI</span>
-                    ) : (
-                      <span className="text-[9px] font-black text-red-600 bg-red-50 px-3 py-1.5 rounded-full">DIPALSUKAN</span>
-                    )}
+                    <div className="flex flex-col items-center gap-1.5">
+                      <span className="text-[8px] font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200 uppercase">💻 Laptop (Lokal)</span>
+                      {cloudSyncedStatus[record.id] ? (
+                        <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 uppercase flex items-center gap-1">
+                          <i className="fas fa-cloud"></i> Database Pusat (Sinkron)
+                        </span>
+                      ) : (
+                        <span className="text-[8px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100 uppercase flex items-center gap-1 animate-pulse">
+                          <i className="fas fa-cloud-slash"></i> Belum Masuk Cloud
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-3">

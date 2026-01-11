@@ -24,6 +24,7 @@ interface FilePreview {
 const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
   const [status, setStatus] = useState<'IDLE' | 'COMPRESSING' | 'EXTRACTING' | 'SAVING' | 'SUCCESS'>('IDLE');
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [syncWarning, setSyncWarning] = useState(false);
   const [lastUploaded, setLastUploaded] = useState<MarriageRecord | null>(null);
   const [formData, setFormData] = useState({
     husbandName: '',
@@ -56,6 +57,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
     setFilePreviews([]);
     setStatus('IDLE');
     setErrorDetail(null);
+    setSyncWarning(false);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,9 +102,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
       setExtractedText(result.fullText || '');
     } catch (err: any) {
       console.error(err);
-      const msg = err.message || "Gagal ekstraksi AI.";
-      setErrorDetail(msg);
-      alert(`Gagal ekstraksi AI: ${msg}\n\nTips: Periksa apakah API Key sudah benar dan memiliki kuota.`);
+      setErrorDetail(err.message || "Gagal ekstraksi AI.");
     } finally {
       setStatus('IDLE');
     }
@@ -137,7 +137,8 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
         uploadedBy: user.username,
       };
 
-      await db.saveRecord(newRecord);
+      const isSynced = await db.saveRecord(newRecord);
+      setSyncWarning(!isSynced);
       setLastUploaded(newRecord);
       setStatus('SUCCESS');
       onSuccess(newRecord);
@@ -151,21 +152,30 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
     return (
       <div className="max-w-2xl mx-auto py-16 animate-in zoom-in duration-500">
         <div className="bg-white p-12 rounded-[48px] shadow-2xl border border-emerald-100 text-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-3 bg-emerald-500"></div>
-          <div className="w-24 h-24 bg-emerald-500 text-white rounded-full flex items-center justify-center text-5xl mx-auto mb-8 shadow-xl shadow-emerald-500/20 ring-8 ring-emerald-50">
-            <i className="fas fa-check"></i>
+          <div className={`absolute top-0 left-0 w-full h-3 ${syncWarning ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
+          <div className={`w-24 h-24 ${syncWarning ? 'bg-amber-500' : 'bg-emerald-500'} text-white rounded-full flex items-center justify-center text-5xl mx-auto mb-8 shadow-xl ring-8 ${syncWarning ? 'ring-amber-50' : 'ring-emerald-50'}`}>
+            <i className={syncWarning ? "fas fa-exclamation-circle" : "fas fa-check"}></i>
           </div>
-          <h2 className="text-3xl font-black text-slate-800 mb-2 uppercase tracking-tight">Sukses Disimpan!</h2>
-          <p className="text-slate-500 font-medium mb-8 italic">Berkas pasangan <span className="text-emerald-600 font-bold uppercase">{lastUploaded?.husbandName} & {lastUploaded?.wifeName}</span> telah terarsip secara digital.</p>
+          <h2 className="text-3xl font-black text-slate-800 mb-2 uppercase tracking-tight">
+            {syncWarning ? 'Arsip Lokal Disimpan' : 'Sukses Disimpan!'}
+          </h2>
           
+          {syncWarning ? (
+            <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 mb-8 text-left">
+              <p className="text-amber-800 font-bold text-sm mb-2">⚠️ Peringatan Sinkronisasi Cloud</p>
+              <p className="text-amber-600 text-xs leading-relaxed">
+                Data berhasil disimpan di Laptop, tetapi <b>GAGAL</b> dikirim ke Database Pusat. 
+                Data ini tidak akan muncul di HP/Firefox sampai masalah koneksi atau izin (Policy) Supabase diperbaiki.
+              </p>
+            </div>
+          ) : (
+            <p className="text-slate-500 font-medium mb-8 italic">Berkas pasangan <span className="text-emerald-600 font-bold uppercase">{lastUploaded?.husbandName} & {lastUploaded?.wifeName}</span> telah terarsip secara digital di Cloud.</p>
+          )}
+
           <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 mb-8 text-left space-y-4">
             <div className="flex justify-between items-center border-b border-slate-200 pb-3">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nomor Akta</span>
-              <span className="text-sm font-bold text-slate-700">{lastUploaded?.nomorAkta}</span>
-            </div>
-            <div className="flex flex-col gap-1">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Digital Signature</span>
-              <span className="text-[9px] text-emerald-600 font-mono break-all bg-emerald-50 p-3 rounded-xl border border-emerald-100">{lastUploaded?.hash}</span>
+              <span className="text-[9px] text-slate-700 font-mono break-all">{lastUploaded?.hash}</span>
             </div>
           </div>
 
@@ -193,7 +203,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
         {errorDetail && (
           <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-4 text-red-600 animate-in slide-in-from-top-2">
             <i className="fas fa-exclamation-triangle text-xl"></i>
-            <div>
+            <div className="flex-1">
               <p className="text-xs font-black uppercase tracking-widest">Gagal Ekstraksi AI</p>
               <p className="text-[11px] font-medium mt-1">{errorDetail}</p>
             </div>
@@ -214,14 +224,8 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
                   {filePreviews.map((p, i) => (
                     <div key={i} className="aspect-[4/3] bg-white rounded-2xl border border-slate-200 overflow-hidden relative group shadow-sm">
                       {p.isImage ? <img src={p.data} className="w-full h-full object-cover" /> : <div className="h-full flex flex-col items-center justify-center bg-red-50 text-red-500"><i className="fas fa-file-pdf text-4xl mb-2"></i><span className="text-[10px] font-black uppercase">PDF READY</span></div>}
-                      <div className="absolute top-2 right-2 bg-black/60 text-white text-[9px] px-2 py-0.5 rounded-full font-bold">Lbr {i+1}</div>
                     </div>
                   ))}
-                  {filePreviews.length < 4 && (
-                    <div className="aspect-[4/3] border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-slate-300">
-                      <i className="fas fa-plus text-2xl"></i>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="text-center p-10">
@@ -238,19 +242,15 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
             <div className="bg-slate-900 rounded-[32px] p-8 text-emerald-400 font-mono text-[11px] overflow-y-auto max-h-[350px] border border-slate-800 shadow-2xl">
               <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
                 <p className="text-white font-black uppercase tracking-[0.2em] text-[10px]">Log Analisa Gemini AI</p>
-                {status === 'EXTRACTING' && <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>}
               </div>
               {status === 'EXTRACTING' ? (
                 <div className="space-y-4">
-                  <p className="animate-pulse">Sedang membaca data dokumen...</p>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 animate-[loading_2s_ease-in-out_infinite]"></div>
-                  </div>
+                  <p className="animate-pulse">Sedang menganalisa dokumen...</p>
                 </div>
               ) : extractedText ? (
                  <div className="whitespace-pre-wrap leading-relaxed opacity-80">{extractedText}</div>
               ) : (
-                <p className="text-slate-500 italic mt-10 text-center uppercase tracking-widest text-[9px]">Menunggu berkas diupload...</p>
+                <p className="text-slate-500 italic mt-10 text-center uppercase tracking-widest text-[9px]">Menunggu berkas...</p>
               )}
             </div>
           </div>
@@ -259,51 +259,30 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
                <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Nama Suami</label>
-                <input type="text" value={formData.husbandName} onChange={e => setFormData({...formData, husbandName: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-sm font-bold uppercase transition-all" />
+                <input type="text" value={formData.husbandName} onChange={e => setFormData({...formData, husbandName: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 outline-none text-sm font-bold uppercase transition-all" />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Nama Istri</label>
-                <input type="text" value={formData.wifeName} onChange={e => setFormData({...formData, wifeName: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-sm font-bold uppercase transition-all" />
+                <input type="text" value={formData.wifeName} onChange={e => setFormData({...formData, wifeName: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 outline-none text-sm font-bold uppercase transition-all" />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Nomor NB</label>
-                <input type="text" value={formData.nomorNB} onChange={e => setFormData({...formData, nomorNB: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-sm font-bold transition-all" />
+                <input type="text" value={formData.nomorNB} onChange={e => setFormData({...formData, nomorNB: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 outline-none text-sm font-bold transition-all" />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Nomor Akta</label>
-                <input type="text" value={formData.nomorAkta} onChange={e => setFormData({...formData, nomorAkta: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-sm font-bold transition-all" />
-              </div>
-               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Tanggal Nikah</label>
-                <input type="date" value={formData.marriageDate} onChange={e => setFormData({...formData, marriageDate: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-sm font-bold transition-all" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Lembar</label>
-                  <input type="number" value={formData.jumlahLembar} onChange={e => setFormData({...formData, jumlahLembar: parseInt(e.target.value)})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-sm font-bold text-center" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Tahun</label>
-                  <input type="text" value={formData.marriageDate.substring(0,4)} disabled className="w-full px-5 py-3.5 rounded-2xl border border-slate-100 bg-slate-50 text-sm font-black text-center text-slate-500" />
-                </div>
+                <input type="text" value={formData.nomorAkta} onChange={e => setFormData({...formData, nomorAkta: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 outline-none text-sm font-bold transition-all" />
               </div>
             </div>
 
             <div className="bg-slate-50 p-8 rounded-[32px] border border-slate-100 space-y-5">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Nomor BOK</label>
-                <input type="text" value={formData.nomorBok} onChange={e => setFormData({...formData, nomorBok: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-sm font-bold placeholder:text-slate-300 transition-all" />
+                <input type="text" value={formData.nomorBok} onChange={e => setFormData({...formData, nomorBok: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 outline-none text-sm font-bold transition-all" />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Lokasi Simpan</label>
-                <input type="text" value={formData.lokasiSimpan} onChange={e => setFormData({...formData, lokasiSimpan: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-sm font-bold transition-all" />
-              </div>
-              <div className="pt-2">
-                <p className="text-[9px] text-slate-400 font-black uppercase mb-3 tracking-widest">Klasifikasi:</p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1.5 bg-emerald-100 text-emerald-700 text-[9px] font-black rounded-full uppercase">Permanen</span>
-                  <span className="px-3 py-1.5 bg-blue-100 text-blue-700 text-[9px] font-black rounded-full uppercase">Asli</span>
-                </div>
+                <input type="text" value={formData.lokasiSimpan} onChange={e => setFormData({...formData, lokasiSimpan: e.target.value})} className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 outline-none text-sm font-bold transition-all" />
               </div>
             </div>
           </div>
@@ -313,22 +292,10 @@ const UploadSection: React.FC<UploadSectionProps> = ({ user, onSuccess }) => {
             disabled={status !== 'IDLE' || filePreviews.length === 0}
             className="w-full bg-slate-900 hover:bg-emerald-600 text-white font-black py-6 rounded-[24px] transition-all shadow-2xl disabled:bg-slate-100 disabled:text-slate-300 flex items-center justify-center gap-4 text-sm uppercase tracking-[0.2em]"
           >
-            {status === 'SAVING' ? (
-              <><i className="fas fa-circle-notch animate-spin text-xl"></i> MENYIMPAN...</>
-            ) : status === 'COMPRESSING' ? (
-              <><i className="fas fa-microchip animate-pulse text-xl"></i> MENGOLAH GAMBAR...</>
-            ) : (
-              <><i className="fas fa-cloud-arrow-up text-xl"></i> Simpan Arsip Digital Jember</>
-            )}
+            {status === 'SAVING' ? "MENYIMPAN..." : "Simpan Arsip Digital Jember"}
           </button>
         </form>
       </div>
-      <style>{`
-        @keyframes loading {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
     </div>
   );
 };
